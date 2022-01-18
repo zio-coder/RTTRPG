@@ -3,7 +3,7 @@ const UserSecure = require("secure");
 const Content = require("items");
 const prefix = "!";
 const perm = [-2072057940];
-const rooms = ["Sharlotted Bot Test"];
+const rooms = ["Sharlotted Bot Test", "[Main] 데브로봇스 커뮤니티 | Devlobots"];
 let users = Database.readObject("user_data");
 
 //additional functions
@@ -40,14 +40,14 @@ function mkbattleselect(msg, user, unit) {
   user.status.callback = (m, u) => {
     let select = battleSelection[parseInt(m.content.replace(/\D/g, ""))];
     if (select) {
-      clearSelection(user);
+      clearSelection(u);
       select.func(m, u, unit);
     }
   };
   msg.reply(battleSelection.map((e, i) => i + ". " + e.desc).join("\n"));
 }
 function battle(msg, user, unit) {
-  msg.reply("전투 발생!\n" + user.name + " vs " + unit.name);
+  msg.reply("전투 발생!\n" + user.id + " vs " + unit.name);
   mkbattleselect(msg, user, new UnitEntity(unit));
 }
 
@@ -79,19 +79,33 @@ const battleSelection = [
   {
     desc: "공격하기",
     func: (msg, user, target) => {
-      if (user.items.weapon.cooltime > 0)
-        return msg.reply("무기 쿨타임: " + user.items.weapon.cooltime + "s");
+      if (user.items.weapon.cooltime > 0) {
+        msg.reply(
+          "무기 쿨타임: " + user.items.weapon.cooltime.toFixed(2) + "s"
+        );
+        mkbattleselect(msg, user, target);
+        return;
+      }
       let weapon = Content.items[user.items.weapon.id];
       if (!weapon) {
         weapon = {
           name: "주먹",
-          damage: 1,
-          cooltime: 0.5,
+          damage: 1 * user.level,
+          cooltime: 2.0,
         };
       }
       user.items.weapon.cooltime = weapon.cooltime;
-      target.health -= weapon.damage;
-      msg.reply("명중! 적에게 " + weapon.damage + "만큼 데미지를 입혔습니다!");
+      msg.reply(
+        "명중! 적에게 " +
+          weapon.name +
+          "(으)로 " +
+          weapon.damage +
+          "만큼 데미지를 입혔습니다!\n" +
+          target.health +
+          "hp -> " +
+          (target.health -= weapon.damage) +
+          "hp"
+      );
       if (target.health == 0) msg.reply("승리! 상대의 hp가 0입니다!");
       else if (target.health < 0)
         msg.reply("오버킬 승리! " + target.health + "hp");
@@ -216,25 +230,24 @@ const ratios = (() => {
 })();
 
 function levelup(user) {
-  bot.send(
-    rooms[0],
+  let str =
     user.id +
-      " 레벨 업! " +
-      user.level +
-      "lv -> " +
-      (user.level + 1) +
-      "lv" +
-      "\n모든 체력과 기력이 회복됩니다." +
-      "\n체력: " +
-      user.stats.health +
-      "hp -> " +
-      (user.stats.health += Math.pow(user.level, 0.6) * 5) +
-      "hp" +
-      "\n기력: " +
-      user.stats.energy +
-      " -> " +
-      (user.stats.energy += Math.pow(user.level, 0.4) * 2.5)
-  );
+    " 레벨 업! " +
+    user.level +
+    "lv -> " +
+    (user.level + 1) +
+    "lv" +
+    "\n모든 체력과 기력이 회복됩니다." +
+    "\n체력: " +
+    user.stats.health +
+    "hp -> " +
+    (user.stats.health += Math.pow(user.level, 0.6) * 5) +
+    "hp" +
+    "\n기력: " +
+    user.stats.energy +
+    " -> " +
+    (user.stats.energy += Math.pow(user.level, 0.4) * 2.5);
+  rooms.forEach((room) => bot.send(room, str));
   user.health = user.stats.health;
   user.energy = user.stats.energy;
   user.level++;
@@ -260,6 +273,21 @@ const inter = setInterval(() => {
 }, 10);
 let selectionTimeout;
 
+function startEvent(event, msg, user) {
+  event.func(msg, user);
+  if (event.selection) {
+    user.status.name = "selecting";
+    user.status.callback = (m, u) => {
+      let select = event.selection[parseInt(m.content.replace(/\D/g, ""))];
+      if (select) {
+        clearSelection(user);
+        select.func(msg, user);
+        if (selectionTimeout) clearTimeout(selectionTimeout);
+      }
+    };
+    msg.reply(event.selection.map((e, i) => i + ". " + e.desc).join("\n"));
+  }
+}
 function search(msg, user) {
   let event =
     eventData[
@@ -268,20 +296,47 @@ function search(msg, user) {
       ]
     ];
   if (!event) return msg.reply("매우 평화로운 초원에서 피톤치트를 느낀다.");
-  event.func(msg, user);
-  if (event.selection) {
-    user.status.name = "selecting";
-    user.status.callback = (m, u) => {
-      let select = event.selection[parseInt(m.content.replace(/\D/g, ""))];
-      if (select) {
-        select.func(msg, user);
-        clearSelection(user);
-        clearTimeout(selectionTimeout);
-      }
-    };
-    msg.reply(event.selection.map((e, i) => i + ". " + e.desc).join("\n"));
-  }
+  startEvent(event, msg, user);
   user.energy -= 5;
+}
+
+function info(content) {
+  return (
+    content.name +
+    "\n" +
+    content.description +
+    (content.details
+      ? "\n------------\n  " + content.details + "\n------------"
+      : "")
+  );
+}
+
+function showContents(msg) {
+  const [, type, name] = msg.content.split(/\s/);
+  if (type != "아이템" && type != "유닛")
+    return msg.reply("!도감 (아이템|유닛) [이름]");
+
+  let str = "";
+  if (type == "유닛") {
+    if (name && !Content.units.some((u) => u.name == name))
+      return msg.reply("유닛 " + name + "(을)를 찾을 수 없습니다.");
+    str =
+      "유닛\n===============\n\n" +
+      (name
+        ? info(Content.units.find((u) => u.name == name))
+        : Content.units.map(info).join("\n\n")) +
+      "\n\n";
+  } else if (type == "아이템") {
+    if (name && !Content.items.some((u) => u.name == name))
+      return msg.reply("아이템 " + name + "(을)를 찾을 수 없습니다.");
+    str =
+      "아이템\n===============\n\n" +
+      (name
+        ? info(Content.items.find((u) => u.name == name))
+        : Content.items.map(info).join("\n\n")) +
+      "\n\n";
+  }
+  msg.reply(str);
 }
 
 function read() {
@@ -383,6 +438,9 @@ function onMessage(msg) {
       let item = Content.items.find((i) => i.name == name && i.consume);
       if (!item) return msg.reply(name + "을(를) 찾을 수 없습니다.");
       item.consume(user, msg);
+      break;
+    case "도감":
+      showContents(msg);
       break;
     case "계정":
       msg.reply(users.map((u) => u.id).join(" | "));

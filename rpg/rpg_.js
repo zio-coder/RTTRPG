@@ -1,16 +1,22 @@
 const bot = BotManager.getCurrentBot();
 const UserSecure = require("secure");
-const Content = require("items");
 const Contents = require("items");
 const prefix = "!";
 const perm = [-2072057940];
 const rooms = [
   "Sharlotted Bot Test",
+  "[Main] 데브로봇스 커뮤니티 | Devlobots",
+  "카카오톡 봇 커뮤니티",
+  "밥풀이의 코딩&프로그래밍 소통방",
+];
 let users = Database.readObject("user_data");
-
 //additional functions
-Math.randbool = () => Math.random() > 0.5;
 Math.range = function (from, to) {
+  return from + Math.random() * (to - from);
+};
+Math.randbool = function (pred) {
+  return Math.random() < (pred || 0.5);
+};
 Math.clamp = function (value, min, max) {
   if (value > max) return max;
   else if (value < min) return min;
@@ -19,9 +25,20 @@ Math.clamp = function (value, min, max) {
 String.prototype.format = function () {
   var formatted = this;
   for (var arg in arguments) {
+    formatted = formatted.replace("{" + arg + "}", arguments[arg]);
+  }
+  return formatted;
+};
+Number.prototype.floor = function (step) {
+  return Math.round(this * Math.pow(10, step)) / Math.pow(10, step);
+};
 
-function ItemEntity(item) {
-  this.item = item.id;
+function EventData(ratio, callback, selections) {
+  this.ratio = ratio;
+  this.func = callback;
+  this.selection = selections;
+}
+
 function ItemEntity(item, amount) {
   this.id = item.id;
   this.health = item.health;

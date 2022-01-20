@@ -1,0 +1,22 @@
+{
+  "auto_logout": "다른 계정에서 자동 로그아웃 되었습니다.",
+  "login_success": "로그인 완료",
+  "login_help": "!로그인 <id> <pw>",
+  "account_exist": "{0}(은)는 이미 존재하는 계정입니다.",
+  "create_success": "계정 생성 완료",
+  "create_help": "!가입 <id> <pw>",
+  "remove_success": "탈퇴 완료",
+  "remove_help": "!탈퇴 <id> <pw>",
+  "logout_success": "로그아웃 완료",
+  "account_notFound": "계정을(를) 찾을 수 없습니다.",
+  "account_incorrect": "비밀번호가 일치하지 않습니다.",
+  "account_have": "이미 이 계정에 로그인했습니다.",
+  "account_has": "이미 누군가가 로그인했습니다.",
+  "account_notLogin": "비로그인 상태입니다.",
+  "change_help": "!변경 (ID|PW) <id> <pw> <바꿀 id/pw>",
+  "change_id": "이전 아이디 {0}(을)를 {1}로 변경했습니다.",
+  "change_pw": "이전 비밀번호 {0}(을)를 {1}로 변경했습니다.",
+  "lang_help": "!언어 <{0}>",
+  "lang_success": "언어를 {0}에서 {1}로 변경했습니다.",
+  "notFound": "{0}(을)를 찾을 수 없습니다."
+}

@@ -1,35 +1,74 @@
-const bot = BotManager.getCurrentBot();
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <title>JSDoc: Source: rpg_.js</title>
+
+    <script src="scripts/prettify/prettify.js"> </script>
+    <script src="scripts/prettify/lang-css.js"> </script>
+    <!--[if lt IE 9]>
+      <script src="//html5shiv.googlecode.com/svn/trunk/html5.js"></script>
+    <![endif]-->
+    <link type="text/css" rel="stylesheet" href="styles/prettify-tomorrow.css">
+    <link type="text/css" rel="stylesheet" href="styles/jsdoc-default.css">
+</head>
+
+<body>
+
+<div id="main">
+
+    <h1 class="page-title">Source: rpg_.js</h1>
+
+    
+
+
+
+    
+    <section>
+        <article>
+            <pre class="prettyprint source linenums"><code>const bot = BotManager.getCurrentBot();
 const UserSecure = require("secure");
-const Content = require("items");
 const Contents = require("items");
 const prefix = "!";
 const perm = [-2072057940];
 const rooms = [
   "Sharlotted Bot Test",
+  "[Main] 데브로봇스 커뮤니티 | Devlobots",
+  "카카오톡 봇 커뮤니티",
+  "밥풀이의 코딩&amp;프로그래밍 소통방",
+];
 let users = Database.readObject("user_data");
 
 //additional functions
-Math.randbool = () => Math.random() > 0.5;
 Math.range = function (from, to) {
+  return from + Math.random() * (to - from);
+};
+Math.randbool = function () {
+  return Math.random() > 0.5;
+};
 Math.clamp = function (value, min, max) {
   if (value > max) return max;
-  else if (value < min) return min;
+  else if (value &lt; min) return min;
   else return value;
 };
 String.prototype.format = function () {
   var formatted = this;
   for (var arg in arguments) {
+    formatted = formatted.replace("{" + arg + "}", arguments[arg]);
+  }
+  return formatted;
+};
 
-function ItemEntity(item) {
-  this.item = item.id;
-function ItemEntity(item, amount) {
-  this.id = item.id;
-  this.health = item.health;
-  this.amount = Number(amount || 1);
+function EventData(ratio, callback, selections) {
+  this.ratio = ratio;
+  this.func = callback;
+  this.selection = selections;
 }
-function WeaponEntity(weapon, amount) {
-  Object.assign(this, new ItemEntity(weapon, amount));
-  this.cooldown = 0;
+
+function ItemEntity(item, amount) {
+  this.item = item.id;
+  this.health = item.helath;
+  this.amount = Number(amount || 1);
 }
 
 function UnitEntity(unit) {
@@ -39,13 +78,13 @@ function UnitEntity(unit) {
 }
 
 function getItem(entity) {
-  return Contents.items[entity.id];
+  return Contents.items[entity.item];
 }
 
 //선택창 초기화
 function clearSelection(user) {
-  user.status.name = null;
-  user.status.callback = null;
+  user.status.name = "";
+  user.status.callback = () => {};
 }
 
 function makeSelection(msg, user, unit, selections) {
@@ -69,11 +108,8 @@ function battle(msg, user, unit) {
 function battlewin(msg, user, target) {
   let unit = Contents.units[target.id];
   let items = [];
-  for (let i = 0; i < Math.floor(Math.range(unit.level, unit.level + 2)); i++) {
-    let item = getOne(
-      Contents.items.filter((i) => i.dropable),
-      "rare"
-    );
+  for (let i = 0; i &lt; Math.floor(Math.range(unit.level, unit.level + 2)); i++) {
+    let item = getOne(Contents.items, "rare");
     if (item) {
       let obj = items.find((i) => i.item == item);
       if (obj) obj.amount++;
@@ -109,14 +145,9 @@ function giveItem(msg, user, item, amount) {
     msg.reply("첫 발견! 도감에 수록되었습니다.");
     user.items.found.push(item.id);
   }
-  let exist = user.items.items.find((i) => i.id == item.id);
+  let exist = user.items.items.find((i) => i.item == item.id);
   if (exist) exist.amount += amount || 1;
-  else
-    user.items.items.push(
-      item.type == "weapon"
-        ? new WeaponEntity(item, amount)
-        : new ItemEntity(item, amount)
-    );
+  else user.items.items.push(new ItemEntity(item, amount));
   save();
 }
 
@@ -154,7 +185,7 @@ const exchangeSelection = [
           t.items
             .map((entity) => {
               let item = getItem(entity);
-              let money = (item.dropable ? 1 - item.rare : item.rare) * 35;
+              let money = (1 - item.rare) * 35;
               return {
                 desc: "{0}: {1}원 ({2}개 보유)".format(
                   item.name,
@@ -172,7 +203,7 @@ const exchangeSelection = [
                         entity.amount
                       )
                     );
-                  else if (u.money < amount * money)
+                  else if (u.money &lt; amount * money)
                     m.reply(
                       "돈이 부족합니다. 필요금: {0}원 > 보유금: {1}원".format(
                         amount * money,
@@ -220,7 +251,7 @@ const exchangeSelection = [
           u.items.items
             .map((entity) => {
               let item = getItem(entity);
-              let money = (item.dropable ? 1 - item.rare : item.rare) * 10;
+              let money = (1 - item.rare) * 10;
               return {
                 desc: "{0}: {1}원 ({2}개 보유)".format(
                   item.name,
@@ -288,45 +319,25 @@ const battleSelection = [
       }
       let weapon = Contents.items[user.items.weapon.id];
       if (!weapon) {
-        weapon = Contents.items.find((u) => u.name == "주먹");
-        user.items.weapon = new WeaponEntity(weapon);
+        weapon = {
+          name: "주먹",
+          damage: 1 * user.level,
+          cooltime: 2.0,
+        };
       }
-      if (Math.randbool(weapon.critical_chance))
+      user.items.weapon.cooltime = weapon.cooltime;
+      msg.reply(
+        "명중! 적에게 {0}(으)로 {1}만큼 데미지를 입혔습니다!\n{2}hp -> {3}hp".format(
+          weapon.name,
+          weapon.damage,
+          target.health,
+          (target.health -= weapon.damage)
+        )
+      );
+      if (target.health &lt;= 0) {
         msg.reply(
-          "치명타 명중! 적에게 {0}(으)로 {1}만큼 데미지를 입혔습니다!\n{2}hp -> {3}hp".format(
-            weapon.name,
-            (weapon.damage * weapon.critical_ratio).floor(2),
-            target.health.floor(2),
-            (target.health -= (weapon.damage * weapon.critical_ratio).floor(
-              2
-            )).toFixed(2)
-          )
-        );
-      else
-        msg.reply(
-          "명중! 적에게 {0}(으)로 {1}만큼 데미지를 입혔습니다!\n{2}hp -> {3}hp".format(
-            weapon.name,
-            weapon.damage,
-            target.health.toFixed(2),
-            (target.health -= weapon.damage.floor(2)).toFixed(2)
-          )
-        );
-
-      if (user.items.weapon.health >= 0) {
-        if (user.items.weapon.health > 1) user.items.weapon.health--;
-        else {
-          //TODO 개수가 여러개인 무기가 체력을 공유함
-          msg.reply("무기 {0}(이)가 파괴되었습니다!".format(weapon.name));
-          weapon = Contents.items.find((u) => u.name == "주먹");
-          user.items.weapon = new WeaponEntity(weapon);
-          save();
-        }
-      }
-
-      if (target.health <= 0) {
-        msg.reply(
-          (target.health < 0 ? "오버킬 " : "") +
-            "승리! 상대의 hp가 {0}입니다!".format(target.health.toFixed(2))
+          (target.health &lt; 0 ? "오버킬 " : "") +
+            "승리! 상대의 hp가 {0}입니다!".format(target.health)
         );
         battlewin(msg, user, target);
       } else makeSelection(msg, user, target, battleSelection);
@@ -398,30 +409,12 @@ const eventData = [
         desc: "거래하기",
         func: (msg, unit) => {
           let goblin = new UnitEntity(Contents.units[1]);
-          for (let i = 0; i < 20; i++) {
-            let item = getOne(
-              Contents.items.filter((i) => i.dropable),
-              "rare"
-            );
+          for (let i = 0; i &lt; 20; i++) {
+            let item = getOne(Contents.items, "rare");
             let exist = goblin.items.find((entity) => getItem(entity) == item);
             if (exist) exist.amount++;
-            else
-              goblin.items.push(
-                item.type == "weapon"
-                  ? new WeaponEntity(item)
-                  : new ItemEntity(item)
-              );
+            else goblin.items.push(new ItemEntity(item));
           }
-
-          let item = getOne(
-            Contents.items.filter((i) => !i.dropable),
-            "rare"
-          );
-          goblin.items.push(
-            item.type == "weapon"
-              ? new WeaponEntity(item)
-              : new ItemEntity(item)
-          );
           msg.reply("고블린과 거래를 시도한다.");
           makeSelection(msg, unit, goblin, exchangeSelection);
         },
@@ -429,10 +422,14 @@ const eventData = [
     ]
   ),
   new EventData(50, (msg, user) => {
-    let item = getOne(
-      Contents.items.filter((i) => i.dropable),
-      "rare"
-    );
+    let item =
+      Contents.items[
+        Math.clamp(
+          Math.floor(Math.random() * Contents.items.length),
+          0,
+          Contents.items.length - 1
+        )
+      ];
     msg.reply(
       "길바닥에 떨어진 {0}을(를) 주웠다!\n{1}: +1".format(item.name, item.name)
     );
@@ -467,7 +464,7 @@ function getOne(arr, ratio) {
   let total = arr.reduce((a, e) => a + e[ratio], 0);
   for (i in arr) {
     random -= arr[i][ratio] / total;
-    if (random < 0) return arr[i];
+    if (random &lt; 0) return arr[i];
   }
 }
 
@@ -557,14 +554,13 @@ function info(user, content) {
 }
 
 function getContentInfo(user, msg) {
-  const [, type] = msg.content.split(/\s/);
-  if (type != "아이템" && type != "유닛")
+  const [, type, name] = msg.content.split(/\s/);
+  if (type != "아이템" &amp;&amp; type != "유닛")
     return msg.reply("!도감 (아이템|유닛) [이름]");
 
   let str = "";
-  let name = msg.content.split(/\s/).slice(2).join(" ");
   if (type == "유닛") {
-    if (name && !Contents.units.some((u) => u.name == name))
+    if (name &amp;&amp; !Contents.units.some((u) => u.name == name))
       return msg.reply("유닛 {0}(을)를 찾을 수 없습니다.".format(name));
     str = "유닛\n===============\n\n{0}\n\n".format(
       name
@@ -575,7 +571,7 @@ function getContentInfo(user, msg) {
         : Contents.units.map((c) => info(user, c)).join("\n\n")
     );
   } else if (type == "아이템") {
-    if (name && !Contents.items.some((u) => u.name == name))
+    if (name &amp;&amp; !Contents.items.some((u) => u.name == name))
       return msg.reply("아이템{0}(을)를 찾을 수 없습니다.".format(name));
     str = "아이템\n===============\n\n{0}\n\n".format(
       name
@@ -589,32 +585,8 @@ function getContentInfo(user, msg) {
   return str;
 }
 
-function getInventory(user) {
-  return "인벤토리\n-----------\n{0}{1}".format(
-    user.items.items.length > 3 ? "\u200b".repeat(500) : "",
-    user.items.items
-      .map((i) => {
-        let item = getItem(i);
-        return "• {0} {1}\n   {2}{3}".format(
-          item.name,
-          i.amount > 0 ? "({0}개)".format(i.amount) : "",
-          item.description,
-          i.health && i.health > 0 && item.health && item.health > 0
-            ? " 내구도: {0}/{1}".format(i.health, item.health)
-            : ""
-        );
-      })
-      .join("\n\n")
-  );
-}
-
 function getUserInfo(user) {
-  let weapon = Contents.items[user.items.weapon.id];
-  if (!weapon) {
-    weapon = Contents.items.find((u) => u.name == "주먹");
-    save();
-  }
-  return "{0} {1}lv, {2}exp/{3}exp\n-----------\n돈: {4}원\n기력: {5}/{6} ({7}기력/s)\n체력: {8}/{9} ({10}체력/s)\n\n장비\n-------------\n무기: {11} {12}\n  *쿨다운: {13}s\n  *데미지: {14} ({15}%확률로 데미지의 {16}%만큼 치명타)".format(
+  return "{0} {1}lv, {2}exp/{3}exp\n-----------\n돈: {4}원\n기력: {5}/{6} ({7}기력/s)\n체력: {8}/{9} ({10}체력/s){11}".format(
     user.id,
     user.level,
     user.exp,
@@ -626,75 +598,44 @@ function getUserInfo(user) {
     user.health.toFixed(1),
     user.stats.health,
     user.stats.health_regen,
-    weapon.name,
-    user.items.weapon.health &&
-      user.items.weapon.health > 0 &&
-      weapon.health &&
-      weapon.health > 0
-      ? " 내구도: {0}/{1}".format(user.items.weapon.health, weapon.health)
-      : "",
-
-    weapon.cooldown,
-    weapon.damage,
-    (weapon.critical_chance * 100).toFixed(2),
-    (weapon.critical_ratio * 100).toFixed(2)
+    user.items.items.length > 0
+      ? "\n\n인벤토리\n{0}".format(
+          user.items.items
+            .map((i) => {
+              let item = getItem(i);
+              return "• {0} {1}\n   {2}{3}".format(
+                item.name,
+                i.amount > 0 ? "({0}개)".format(i.amount) : "",
+                item.description,
+                item.health >= 0
+                  ? "내구도: {0}/{1}".format(i.health, item.helath)
+                  : ""
+              );
+            })
+            .join("\n\n")
+        )
+      : ""
   );
-}
-
-/**
- *
- * @param {User} user 가방에서 무기를 꺼내 장착할 유저 객체
- * @param {Message} msg 메시지를 보낼 객체
- * @param {string} weapon 무기 아이템 이름. 이 이름을 지닌 아이템은 무조건 damage를 가져야 함
- */
-function switchWeapon(user, msg, weapon) {
-  let item = Contents.items.find((i) => i.name == weapon);
-  if (!item) msg.reply("무기 {0}(을)를 찾을 수 없습니다.".format(weapon));
-  else {
-    let entity = user.items.items.find((entity) => entity.id == item.id);
-    if (!entity) msg.reply("무기 {0}(이)가 가방에 없습니다.".format(weapon));
-    else {
-      if (entity.amount == 1)
-        user.items.items.splice(user.items.items.indexOf(entity), 1);
-      else entity.amount--;
-
-      if (user.items.weapon.id != -1) {
-        msg.reply(
-          "무기 {0}(을)를 장착하고 무기 {1}(을)를 가방에 넣었습니다.".format(
-            weapon,
-            Contents.items[user.items.weapon.id].name
-          )
-        );
-        giveItem(msg, user, item);
-        user.items.weapon.id = item.id;
-      } else {
-        msg.reply("무기 {0}(을)를 장착했습니다.".format(weapon));
-        user.items.weapon.id = item.id;
-      }
-      save();
-    }
-  }
 }
 
 function read() {
   return Database.readObject("user_data");
 }
-
 function save() {
   checkusers();
   Database.writeObject("user_data", users);
 }
 
 function onMessage(msg) {
-  if (msg.isGroupChat && !rooms.includes(msg.room)) return;
+  if (msg.isGroupChat &amp;&amp; !rooms.includes(msg.room)) return;
 
   const hash = java.lang.String(msg.author.avatar.getBase64()).hashCode();
   const user = users.find((u) => u.hash == hash);
 
-  if (perm.includes(hash) && msg.content.startsWith("de")) {
+  if (perm.includes(hash) &amp;&amp; msg.content.startsWith("de")) {
     try {
       let result = eval(msg.content.slice(2).trim());
-      if (typeof result == "string" && result.length < 1)
+      if (typeof result == "string" &amp;&amp; result.length &lt; 1)
         result = '[eval] 결과값이 ""입니다.';
       msg.reply(result);
     } catch (e) {
@@ -702,49 +643,7 @@ function onMessage(msg) {
     }
   }
 
-  if (msg.content.startsWith(prefix))
-    switch (msg.content.slice(1).split(/\s/)[0]) {
-      case "상태창":
-        if (!user) return msg.reply("비로그인 상태입니다.");
-        var targetid = msg.content.split(/\s/)[1];
-        var target = targetid
-          ? users.find((u) => u.id == targetid) ||
-            msg.reply("계정 {0}(을)를 찾을 수 없습니다.".format(targetid))
-          : user;
-        if (!target) return;
-        msg.reply(getUserInfo(target));
-        break;
-      case "인벤토리":
-        if (!user) return msg.reply("비로그인 상태입니다.");
-        var targetid = msg.content.split(/\s/)[1];
-        var target = targetid
-          ? users.find((u) => u.id == targetid) ||
-            msg.reply("계정 {0}(을)를 찾을 수 없습니다.".format(targetid))
-          : user;
-        if (!target) return;
-        msg.reply(getInventory(target));
-        break;
-      case "소모":
-        if (!user) return msg.reply("비로그인 상태입니다.");
-        let name = msg.content.slice(4);
-        if (!name) return msg.reply("!소모 <아이템명>");
-        let item = Contents.items.find((i) => i.name == name && i.consume);
-        if (!item) return msg.reply(name + "을(를) 찾을 수 없습니다.");
-        item.consume(user, msg);
-        break;
-      case "도감":
-        if (!user) return msg.reply("비로그인 상태입니다.");
-        msg.reply(getContentInfo(user, msg));
-        break;
-      case "전환":
-        if (!user) return msg.reply("비로그인 상태입니다.");
-        let weapon = msg.content.split(/\s/).slice(1).join(" ");
-        if (!weapon) msg.reply("!전환 <아이템>");
-        else switchWeapon(user, msg, weapon);
-        break;
-    }
-
-  if (user && user.status.callback && user.status.name == "selecting") {
+  if (user &amp;&amp; user.status.callback &amp;&amp; user.status.name == "selecting") {
     return user.status.callback(msg, user);
   }
 
@@ -752,7 +651,7 @@ function onMessage(msg) {
   switch (msg.content.slice(1).split(/\s/)[0]) {
     case "돌아다니기":
       if (!user) return msg.reply("비로그인 상태입니다.");
-      else if (user.energy < 7) {
+      else if (user.energy &lt; 7) {
         if (user.countover >= 3) {
           msg.reply("게임을 좀 여유롭게 플레이하세요.");
         } else {
@@ -764,6 +663,28 @@ function onMessage(msg) {
         search(msg, user);
       }
       save();
+      break;
+    case "상태창":
+      if (!user) return msg.reply("비로그인 상태입니다.");
+      let targetid = msg.content.split(/\s/)[1];
+      let target = targetid
+        ? users.find((u) => u.id == targetid) ||
+          msg.reply("계정 {0}(을)를 찾을 수 없습니다.".format(targetid))
+        : user;
+      if (!target) return;
+      msg.reply(getUserInfo(target));
+      break;
+    case "소모":
+      if (!user) return msg.reply("비로그인 상태입니다.");
+      let name = msg.content.slice(4);
+      if (!name) return msg.reply("!소모 &lt;아이템명>");
+      let item = Contents.items.find((i) => i.name == name &amp;&amp; i.consume);
+      if (!item) return msg.reply(name + "을(를) 찾을 수 없습니다.");
+      item.consume(user, msg);
+      break;
+    case "도감":
+      if (!user) return msg.reply("비로그인 상태입니다.");
+      msg.reply(getContentInfo(user, msg));
       break;
     case "계정":
       msg.reply(users.map((u) => u.id).join(" | "));
@@ -788,11 +709,30 @@ function onMessage(msg) {
       UserSecure.change(msg);
       users = read();
       break;
-    case "언어":
-      UserSecure.setLang(msg);
-      users = read();
-      break;
   }
 }
 
 bot.addListener(Event.MESSAGE, onMessage);
+</code></pre>
+        </article>
+    </section>
+
+
+
+
+</div>
+
+<nav>
+    <h2><a href="index.html">Home</a></h2><h3>Classes</h3><ul><li><a href="Accessory.html">Accessory</a></li><li><a href="Armor.html">Armor</a></li><li><a href="Consumable.html">Consumable</a></li><li><a href="Content.html">Content</a></li><li><a href="Item.html">Item</a></li><li><a href="Potion.html">Potion</a></li><li><a href="Unit.html">Unit</a></li><li><a href="Weapon.html">Weapon</a></li></ul><h3>Global</h3><ul><li><a href="global.html#getOne">getOne</a></li><li><a href="global.html#giveItem">giveItem</a></li><li><a href="global.html#items">items</a></li><li><a href="global.html#units">units</a></li></ul>
+</nav>
+
+<br class="clear">
+
+<footer>
+    Documentation generated by <a href="https://github.com/jsdoc/jsdoc">JSDoc 3.6.7</a> on Wed Jan 19 2022 22:00:28 GMT+0900 (대한민국 표준시)
+</footer>
+
+<script> prettyPrint(); </script>
+<script src="scripts/linenumber.js"> </script>
+</body>
+</html>

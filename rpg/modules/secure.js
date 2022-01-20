@@ -1,5 +1,7 @@
+const Bundle = require("bundle");
+
 function Healthy(health) {
-  this.health;
+  this.health = health;
 }
 
 function User(id, pw, hash) {
@@ -12,18 +14,20 @@ function User(id, pw, hash) {
   this.level = 1;
   this.exp = 0;
   this.countover = 0;
+  this.lang = "ko";
   this.stats = {
     health: 100,
-    health_regen: 1,
+    health_regen: 0.1,
     energy: 50,
-    energy_regen: 1,
+    energy_regen: 0.5,
     strength: 10,
     defense: 0,
   };
   this.items = {
     weapon: {
       cooltime: 0,
-      id: -1,
+      id: 2,
+      health: 0,
     },
     helmet: {},
     shield: {},
@@ -35,6 +39,7 @@ function User(id, pw, hash) {
       size: 50,
     },
     items: [],
+    found: [],
   };
   this.status = {
     name: "",
@@ -50,11 +55,11 @@ function login(users, target, msg) {
       u.hash = "";
       return u;
     });
-    msg.reply("다른 계정에서 자동 로그아웃 되었습니다.");
+    msg.reply(Bundle.find(target.lang, "auto_logout"));
   }
   target.hash = hash;
   Database.writeObject("user_data", users);
-  msg.reply("로그인 완료");
+  msg.reply(Bundle.find(target.lang, "login_success"));
 }
 
 module.exports = {
@@ -63,14 +68,18 @@ module.exports = {
     const users = Database.readObject("user_data");
     const hash = java.lang.String(msg.author.avatar.getBase64()).hashCode();
     const [id, pw] = msg.content.slice(4).split(/\s/);
-    if (!id || !pw) msg.reply("!가입 <id> <pw>");
+    if (!id || !pw) msg.reply(Bundle.find("ko", "create_help"));
     else if (users.find((u) => u.id == id))
-      msg.reply(id + " 는 이미 존재하는 계정입니다.");
+      msg.reply(
+        Bundle.find(users.find((u) => u.id == id).lang, "account_exist").format(
+          id
+        )
+      );
     else {
       const target = new User(id, pw, hash);
       users.push(target);
       login(users, target, msg);
-      msg.reply("계정 생성 완료");
+      msg.reply(Bundle.find(target.lang, "create_success"));
     }
   },
   remove: (msg) => {
@@ -78,14 +87,16 @@ module.exports = {
     const hash = java.lang.String(msg.author.avatar.getBase64()).hashCode();
     const [id, pw] = msg.content.slice(4).split(/\s/);
     const target = users.find((u) => u.id == id);
-    if (!id || !pw) msg.reply("!탈퇴 <id> <pw>");
-    else if (!target) msg.reply("탈퇴 대상을 찾을 수 없습니다.");
-    else if (target.pw !== pw) msg.reply("비밀번호가 일치하지 않습니다.");
-    else if (target.hash !== hash) msg.reply("로그인하지 않았습니다.");
+    if (!id || !pw) msg.reply(Bundle.find("ko", "remove_help"));
+    else if (!target) msg.reply(Bundle.find("ko", "account_notFound"));
+    else if (target.pw !== pw)
+      msg.reply(Bundle.find(target.lang, "account_incorrect"));
+    else if (target.hash !== hash)
+      msg.reply(Bundle.find(target.lang, "account_notLogin"));
     else {
       users.splice(users.indexOf(target), 1);
       Database.writeObject("user_data", users);
-      msg.reply("탈퇴 완료");
+      msg.reply(Bundle.find(target.lang, "remove_success"));
     }
   },
   signin: (msg) => {
@@ -93,14 +104,15 @@ module.exports = {
     const hash = java.lang.String(msg.author.avatar.getBase64()).hashCode();
     const [id, pw] = msg.content.slice(5).split(/\s/);
     const target = users.find((u) => u.id == id);
-    if (!id || !pw) msg.reply("!로그인 <id> <pw>");
-    else if (!target) msg.reply("로그인 대상을 찾을 수 없습니다.");
-    else if (target.pw !== pw) msg.reply("비밀번호가 일치하지 않습니다.");
+    if (!id || !pw) msg.reply(Bundle.find("ko", "login_help"));
+    else if (!target) msg.reply(Bundle.find("ko", "account_notFound"));
+    else if (target.pw !== pw)
+      msg.reply(Bundle.find(target.lang, "account_incorrect"));
     else if (target.hash)
       msg.reply(
-        "이미 " +
-          (target.hash == hash ? "이 계정에" : "누군가가") +
-          " 로그인했습니다."
+        target.hash == hash
+          ? Bundle.find(target.lang, "account_have")
+          : Bundle.find(target.lang, "account_has")
       );
     else login(users, target, msg);
   },
@@ -108,37 +120,59 @@ module.exports = {
     const users = Database.readObject("user_data");
     const hash = java.lang.String(msg.author.avatar.getBase64()).hashCode();
     const target = users.find((u) => u.hash == hash);
-    if (!target) msg.reply("로그인하지 않았습니다.");
+    if (!target) msg.reply(Bundle.find("ko", "account_notLogin"));
     else {
       target.hash = "";
       Database.writeObject("user_data", users);
-      msg.reply("로그아웃 완료");
+      msg.reply(Bundle.find(target.lang, "logout_success"));
     }
   },
   change: (msg) => {
     const users = Database.readObject("user_data");
     const [, type, id, pw, changeto] = msg.content.split(/\s/);
     const target = users.find((u) => u.id == id);
-    if (!id || !pw || !(type == "아이디" || type == "비번") || !changeto)
-      msg.reply("!변경 (아이디|비번) <id> <pw> <바꿀 id 또는 pw>");
+    if (
+      !id ||
+      !pw ||
+      !type ||
+      !(type.toLowerCase() == "id" || typet.toLowerCase() == "pw") ||
+      !changeto
+    )
+      msg.reply(Bundle.find("ko", "change_help"));
     else if (!target) {
-      msg.reply("계정 " + id + "를 찾을 수 없습니다.");
-    } else if (type == "아이디") {
+      msg.reply(Bundle.find("ko", "account_notFound"));
+    } else if (type.toLowerCase() == "pw") {
       if (users.find((u) => u.id == changeto))
-        msg.reply(changeto + "(은)는 이미 존재하는 계정입니다.");
+        msg.reply(Bundle.find(target.lang, "account_exist").format(id));
       else {
         msg.reply(
-          "이전 아이디 " + target.id + "를 " + changeto + "로 변경했습니다."
+          Bundle.find(target.lang, "change_id").format(target.id, changeto)
         );
         target.id = changeto;
       }
-    } else if (type == "비번") {
+    } else if (type.toLowerCase() == "id") {
       msg.reply(
-        "이전 비밀번호 " + target.id + "를 " + changeto + "로 변경했습니다."
+        Bundle.find(target.lang, "change_pw").format(target.id, changeto)
       );
       target.pw = changeto;
     }
 
+    Database.writeObject("user_data", users);
+  },
+  setLang: (msg) => {
+    const [, langto] = msg.content.split(/\s/);
+    const users = Database.readObject("user_data");
+    const hash = java.lang.String(msg.author.avatar.getBase64()).hashCode();
+    const user = users.find((u) => u.hash == hash);
+
+    if (!user) return msg.reply(Bundle.find("ko", "account_notLogin"));
+    if (!langto || !Bundle.langs.includes(langto))
+      return msg.reply(
+        Bundle.find(user.lang, "lang_help").format(Bundle.langs.join(" | "))
+      );
+
+    msg.reply(Bundle.find(user.lang, "lang_success").format(user.lang, langto));
+    user.lang = langto;
     Database.writeObject("user_data", users);
   },
 };

@@ -809,6 +809,10 @@ function onMessage(msg) {
       UserSecure.setLang(msg);
       users = read();
       break;
+    case "탐험":
+      UserSecure.adventure(msg);
+      users = read();
+      break;
   }
 }
 
